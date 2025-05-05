@@ -9,7 +9,102 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar: string | null
+          bio: string | null
+          email: string
+          id: string
+          job_title: string
+          location: string
+          name: string
+        }
+        Insert: {
+          avatar?: string | null
+          bio?: string | null
+          email: string
+          id: string
+          job_title: string
+          location: string
+          name: string
+        }
+        Update: {
+          avatar?: string | null
+          bio?: string | null
+          email?: string
+          id?: string
+          job_title?: string
+          location?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          description: string | null
+          end_date: string
+          id: string
+          industry: string
+          name: string
+          start_date: string
+          tools: string[]
+          type: string
+        }
+        Insert: {
+          description?: string | null
+          end_date: string
+          id?: string
+          industry: string
+          name: string
+          start_date: string
+          tools: string[]
+          type: string
+        }
+        Update: {
+          description?: string | null
+          end_date?: string
+          id?: string
+          industry?: string
+          name?: string
+          start_date?: string
+          tools?: string[]
+          type?: string
+        }
+        Relationships: []
+      }
+      team_member_projects: {
+        Row: {
+          id: string
+          profile_id: string
+          project_id: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          project_id: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_member_projects_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_member_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
