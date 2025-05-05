@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { Project, ExperienceMetrics, Industry, ProjectType, HumaticaTool } from "../types";
@@ -91,43 +90,43 @@ export function formatDate(date: Date): string {
 // Get color for industry
 export function getIndustryColor(industry: Industry): string {
   const colorMap: Record<Industry, string> = {
-    "Technology": "bg-blue-500",
-    "Healthcare": "bg-green-500",
-    "Financial Services": "bg-purple-500",
-    "Manufacturing": "bg-orange-500",
-    "Retail": "bg-pink-500",
-    "Energy": "bg-yellow-500",
-    "Education": "bg-teal-500",
-    "Telecommunications": "bg-indigo-500",
-    "Other": "bg-gray-500"
+    "Technology": "#3b82f6", // blue-500
+    "Healthcare": "#22c55e", // green-500
+    "Financial Services": "#a855f7", // purple-500
+    "Manufacturing": "#f97316", // orange-500
+    "Retail": "#ec4899", // pink-500
+    "Energy": "#eab308", // yellow-500
+    "Education": "#14b8a6", // teal-500
+    "Telecommunications": "#6366f1", // indigo-500
+    "Other": "#6b7280" // gray-500
   };
   
-  return colorMap[industry] || "bg-gray-500";
+  return colorMap[industry] || "#6b7280";
 }
 
 // Get color for project type
 export function getProjectTypeColor(type: ProjectType): string {
   const colorMap: Record<ProjectType, string> = {
-    "Align and activate": "bg-emerald-500",
-    "Right-sizing": "bg-amber-500",
-    "PMI": "bg-sky-500",
-    "Org DD": "bg-fuchsia-500",
-    "TOM implementation": "bg-rose-500",
-    "Other": "bg-gray-500"
+    "Align and activate": "#10b981", // emerald-500
+    "Right-sizing": "#f59e0b", // amber-500
+    "PMI": "#0ea5e9", // sky-500
+    "Org DD": "#d946ef", // fuchsia-500
+    "TOM implementation": "#f43f5e", // rose-500
+    "Other": "#6b7280" // gray-500
   };
   
-  return colorMap[type] || "bg-gray-500";
+  return colorMap[type] || "#6b7280";
 }
 
 // Get color for Humatica tool
 export function getToolColor(tool: HumaticaTool): string {
   const colorMap: Record<HumaticaTool, string> = {
-    "altus": "bg-blue-600",
-    "modas": "bg-purple-600",
-    "none": "bg-gray-400"
+    "altus": "#2563eb", // blue-600
+    "modas": "#7c3aed", // purple-600
+    "none": "#9ca3af" // gray-400
   };
   
-  return colorMap[tool] || "bg-gray-400";
+  return colorMap[tool] || "#9ca3af";
 }
 
 // Calculate experience level based on project count

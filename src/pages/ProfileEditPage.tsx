@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +21,7 @@ import { Tables } from "@/integrations/supabase/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Project, Industry, ProjectType } from "@/types";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { getMonthsBetween } from "@/lib/utils";
 
 type Profile = Tables<"profiles">;
 type ProjectResponse = Tables<"projects">;
@@ -122,6 +122,7 @@ const ProfileEditPage = () => {
           job_title: profile.job_title,
           location: profile.location,
           bio: profile.bio,
+          start_date: profile.start_date,
         })
         .eq("id", user.id);
 
@@ -286,6 +287,21 @@ const ProfileEditPage = () => {
                       placeholder="Tell us about yourself and your expertise..."
                       rows={4}
                     />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="startDate">Start Date</Label>
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={profile.start_date || ''}
+                      onChange={(e) => setProfile({ ...profile, start_date: e.target.value })}
+                    />
+                    {profile.start_date && (
+                      <p className="text-sm text-muted-foreground">
+                        Experience: {getMonthsBetween(new Date(profile.start_date), new Date())} months
+                      </p>
+                    )}
                   </div>
                 </CardContent>
                 <CardFooter>

@@ -18,6 +18,7 @@ export type Database = {
           job_title: string
           location: string
           name: string
+          start_date: string | null
         }
         Insert: {
           avatar?: string | null
@@ -27,6 +28,7 @@ export type Database = {
           job_title: string
           location: string
           name: string
+          start_date?: string | null
         }
         Update: {
           avatar?: string | null
@@ -36,6 +38,7 @@ export type Database = {
           job_title?: string
           location?: string
           name?: string
+          start_date?: string | null
         }
         Relationships: []
       }

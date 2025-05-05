@@ -1,4 +1,3 @@
-
 export type ProjectType = 
   | "Align and activate"
   | "Right-sizing"
@@ -40,6 +39,7 @@ export interface TeamMember {
   avatar: string;
   bio?: string;
   projectIds: string[];
+  startDate?: string;
 }
 
 export interface ExperienceMetrics {

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,13 +6,14 @@ import { ExperienceBadge } from "@/components/ExperienceBadge";
 import { ExperienceChart } from "@/components/ExperienceChart";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { calculateExperienceMetrics } from "@/lib/utils";
+import { calculateExperienceMetrics, getMonthsBetween } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { NavBar } from "@/components/NavBar";
 import { Tables } from "@/integrations/supabase/types";
 import { useToast } from "@/components/ui/use-toast";
 import { Project } from "@/types";
+import { Badge } from "@/components/ui/badge";
 
 type Profile = Tables<"profiles">;
 type ProjectResponse = Tables<"projects">;
@@ -121,6 +121,9 @@ const ProfilePage = () => {
   
   const metrics = calculateExperienceMetrics(projects);
   const initials = profile.name.split(' ').map(n => n[0]).join('');
+  const totalExperience = profile.start_date 
+    ? getMonthsBetween(new Date(profile.start_date), new Date())
+    : metrics.totalMonths;
 
   return (
     <div className="min-h-screen bg-background">
@@ -171,7 +174,7 @@ const ProfilePage = () => {
             <Card>
               <CardContent className="p-6 flex items-center justify-between">
                 <div className="text-muted-foreground">Total Experience</div>
-                <div className="text-3xl font-bold">{metrics.totalMonths} <span className="text-base font-normal">months</span></div>
+                <div className="text-3xl font-bold">{totalExperience} <span className="text-base font-normal">months</span></div>
               </CardContent>
             </Card>
             <Card>
@@ -183,14 +186,51 @@ const ProfilePage = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Project Type Badges */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-4">Project Type Achievements</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(metrics.byType)
+                .filter(([_, data]) => data.projects > 0)
+                .map(([type, data]) => {
+                  let badgeColor = "bg-gray-500";
+                  let badgeText = "Bronze";
+                  if (data.projects >= 5) {
+                    badgeColor = "bg-yellow-500";
+                    badgeText = "Gold";
+                  } else if (data.projects >= 3) {
+                    badgeColor = "bg-gray-300";
+                    badgeText = "Silver";
+                  }
+                  return (
+                    <Card key={type}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium">{type}</h4>
+                            <p className="text-sm text-muted-foreground">{data.projects} projects</p>
+                          </div>
+                          <Badge className={`${badgeColor} text-white`}>
+                            {badgeText}
+                          </Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+            </div>
+          </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <ExperienceChart 
+              key="industry-chart"
               metrics={metrics} 
               type="industry" 
               dataType="projects" 
             />
             <ExperienceChart 
+              key="project-type-chart"
               metrics={metrics} 
               type="projectType" 
               dataType="projects" 

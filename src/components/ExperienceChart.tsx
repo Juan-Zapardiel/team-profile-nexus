@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Bar, 
@@ -9,7 +8,8 @@ import {
   PieChart, 
   ResponsiveContainer, 
   Tooltip, 
-  XAxis 
+  XAxis, 
+  YAxis 
 } from "recharts";
 import { 
   getIndustryColor, 
@@ -62,8 +62,8 @@ export function ExperienceChart({ metrics, type, dataType }: ExperienceChartProp
   data = data.sort((a, b) => b.value - a.value);
 
   const renderChart = () => {
-    if (data.length <= 3) {
-      // Use pie chart for small datasets
+    if (type === "industry") {
+      // Always use pie chart for industries
       return (
         <ResponsiveContainer width="100%" height={240}>
           <PieChart>
@@ -76,33 +76,71 @@ export function ExperienceChart({ metrics, type, dataType }: ExperienceChartProp
               fill="#8884d8"
               dataKey="value"
               nameKey="name"
-              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+              label={false}
             >
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={`var(--${entry.color})`} />
+                <Cell key={`cell-${index}`} fill={entry.color} />
               ))}
             </Pie>
             <Tooltip 
-              formatter={(value) => [`${value} ${dataType}`, '']}
-              itemStyle={{ color: '#000' }}
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-white p-2 border rounded shadow-sm">
+                      <p className="font-medium">{data.name}</p>
+                      <p className="text-sm">Projects: {data.value}</p>
+                      <p className="text-sm">Months: {metrics.byIndustry[data.name as Industry].months}</p>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+            <Legend 
+              layout="vertical" 
+              align="right" 
+              verticalAlign="middle"
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ 
+                fontSize: '12px', 
+                paddingLeft: '5px',
+                marginLeft: '-5px'
+              }}
             />
           </PieChart>
         </ResponsiveContainer>
       );
     } else {
-      // Use bar chart for larger datasets
+      // Always use vertical bar chart for project types
       return (
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={data} layout="vertical">
-            <XAxis type="number" hide />
-            <Tooltip 
-              formatter={(value) => [`${value} ${dataType}`, '']}
-              itemStyle={{ color: '#000' }}
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={data}>
+            <XAxis 
+              type="category" 
+              dataKey="name" 
+              tick={{ fontSize: 12 }}
+              interval={0}
             />
-            <Legend />
-            <Bar dataKey="value">
+            <Tooltip 
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-white p-2 border rounded shadow-sm">
+                      <p className="font-medium">{data.name}</p>
+                      <p className="text-sm">Projects: {data.value}</p>
+                      <p className="text-sm">Months: {metrics.byType[data.name as ProjectType].months}</p>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+            <Bar dataKey="value" fill="#3b82f6" label={{ position: 'top', fill: '#000000' }}>
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={`var(--${entry.color})`} />
+                <Cell key={`cell-${index}`} fill="#3b82f6" />
               ))}
             </Bar>
           </BarChart>

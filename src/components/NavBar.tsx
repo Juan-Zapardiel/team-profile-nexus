@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { LogOut, User, Edit } from "lucide-react";
@@ -12,7 +11,7 @@ export function NavBar() {
       <div className="container flex h-16 items-center justify-between">
         <div>
           <Link to="/" className="text-xl font-bold">
-            Team Profile Nexus
+            Humatica Experience Tracker
           </Link>
         </div>
         

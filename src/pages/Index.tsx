@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { TeamMemberCard } from "@/components/TeamMemberCard";
@@ -109,7 +108,7 @@ const Index = () => {
       <NavBar />
       <div className="container py-10 max-w-7xl">
         <header className="mb-12 text-center">
-          <h1 className="text-4xl font-bold mb-4">Team Profile Nexus</h1>
+          <h1 className="text-4xl font-bold mb-4">Humatica Experience Tracker</h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-6">
             Explore our team's experiences, projects, and skills across various industries and project types.
           </p>
@@ -139,6 +138,7 @@ const Index = () => {
                     avatar: profile.avatar || '/placeholder.svg',
                     bio: profile.bio,
                     projectIds: [],
+                    startDate: profile.start_date || undefined,
                   }}
                   projects={projectsMap[profile.id] || []}
                 />

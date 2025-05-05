@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,7 +84,7 @@ const AuthPage = () => {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Team Profile Nexus</CardTitle>
+          <CardTitle className="text-2xl">Humatica Experience Tracker</CardTitle>
           <CardDescription>
             {authMode === "login" ? "Sign in to your account" : "Create a new account"}
           </CardDescription>
