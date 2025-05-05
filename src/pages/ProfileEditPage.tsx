@@ -26,6 +26,17 @@ import { getMonthsBetween } from "@/lib/utils";
 type Profile = Tables<"profiles">;
 type ProjectResponse = Tables<"projects">;
 
+// Function to get a color based on the team member's name
+function getAvatarColor(name: string): React.CSSProperties {
+  if (name === "Juan Zapardiel") {
+    return { "--avatar-bg": "#F0F8FF" } as React.CSSProperties;
+  }
+  if (name === "Edward Kardouss") {
+    return { "--avatar-bg": "#F5F5DC" } as React.CSSProperties;
+  }
+  return { "--avatar-bg": "#E6E6FA" } as React.CSSProperties; // Default to Lavender for others
+}
+
 const ProfileEditPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -234,9 +245,11 @@ const ProfileEditPage = () => {
               <form onSubmit={handleProfileUpdate}>
                 <CardContent className="space-y-4">
                   <div className="flex items-center space-x-4 mb-6">
-                    <Avatar className="h-20 w-20">
-                      <AvatarImage src={profile.avatar || '/placeholder.svg'} alt={profile.name} />
-                      <AvatarFallback>
+                    <Avatar 
+                      className="h-20 w-20 [&>span]:bg-[var(--avatar-bg)]" 
+                      style={getAvatarColor(profile.name)}
+                    >
+                      <AvatarFallback className="text-xl text-black">
                         {profile.name.split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>

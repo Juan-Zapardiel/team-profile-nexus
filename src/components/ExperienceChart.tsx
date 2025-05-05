@@ -33,11 +33,26 @@ export function ExperienceChart({ metrics, type, dataType }: ExperienceChartProp
     title = dataType === "projects" ? "Projects by Industry" : "Experience (Months) by Industry";
     data = Object.entries(metrics.byIndustry)
       .filter(([_, values]) => values[dataType] > 0)
-      .map(([industry, values]) => ({
-        name: industry,
-        value: values[dataType],
-        color: getIndustryColor(industry as Industry).replace("bg-", "")
-      }));
+      .map(([industry, values]) => {
+        const colorClass = getIndustryColor(industry as Industry);
+        // Convert Tailwind color classes to hex colors
+        const colorMap: Record<string, string> = {
+          "bg-blue-400": "#60a5fa",
+          "bg-green-400": "#4ade80",
+          "bg-purple-400": "#c084fc",
+          "bg-orange-400": "#fb923c",
+          "bg-pink-400": "#f472b6",
+          "bg-yellow-400": "#facc15",
+          "bg-teal-400": "#2dd4bf",
+          "bg-indigo-400": "#818cf8",
+          "bg-gray-400": "#9ca3af"
+        };
+        return {
+          name: industry,
+          value: values[dataType],
+          color: colorMap[colorClass] || "#9ca3af"
+        };
+      });
   } else if (type === "projectType") {
     title = dataType === "projects" ? "Projects by Type" : "Experience (Months) by Project Type";
     data = Object.entries(metrics.byType)

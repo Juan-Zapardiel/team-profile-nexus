@@ -8,6 +8,8 @@ import { Loader2 } from "lucide-react";
 import { Project } from "@/types";
 import { SeedButton } from "@/components/SeedButton";
 import { useAuth } from "@/context/AuthContext";
+import { ProjectDatabase } from "@/components/ProjectDatabase";
+import { useNavigate } from "react-router-dom";
 
 type Profile = Tables<"profiles">;
 type ProjectResponse = Tables<"projects">;
@@ -30,10 +32,12 @@ const convertToProjectType = (project: ProjectResponse): Project => {
 const Index = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [projectsMap, setProjectsMap] = useState<Record<string, Project[]>>({});
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [projectCount, setProjectCount] = useState(0);
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -74,6 +78,10 @@ const Index = () => {
         });
       }
 
+      // Convert all projects
+      const convertedProjects = projectsData?.map(convertToProjectType) || [];
+      setAllProjects(convertedProjects);
+
       setProfiles(profilesData || []);
       setProjectsMap(projectsByProfile);
       setProjectCount(projectsData?.length || 0);
@@ -91,6 +99,10 @@ const Index = () => {
   useEffect(() => {
     fetchData();
   }, [toast]);
+
+  const handleAddProject = () => {
+    navigate("/add-project");
+  };
 
   if (isLoading) {
     return (
@@ -120,7 +132,7 @@ const Index = () => {
           )}
         </header>
 
-        <section>
+        <section className="mb-12">
           <h2 className="text-2xl font-semibold mb-6">Team Members</h2>
           {profiles.length === 0 ? (
             <p className="text-center text-muted-foreground">No team members found.</p>
@@ -145,6 +157,13 @@ const Index = () => {
               ))}
             </div>
           )}
+        </section>
+
+        <section>
+          <ProjectDatabase 
+            projects={allProjects} 
+            onAddProject={handleAddProject}
+          />
         </section>
       </div>
     </div>

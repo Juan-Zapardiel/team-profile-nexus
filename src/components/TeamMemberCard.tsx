@@ -1,14 +1,44 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TeamMember } from "@/types";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { TeamMember, Industry } from "@/types";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { calculateExperienceMetrics, getMonthsBetween, getIndustryColor, getProjectTypeColor } from "@/lib/utils";
 import { Project } from "@/types";
 
 interface TeamMemberCardProps {
   member: TeamMember;
   projects: Project[];
+}
+
+// List of soft colors for avatars
+const softColors = [
+  "#FFE4E1", // Misty Rose
+  "#E6E6FA", // Lavender
+  "#F0F8FF", // Alice Blue
+  "#F5F5DC", // Beige
+  "#FFF0F5", // Lavender Blush
+  "#F0FFF0", // Honeydew
+  "#F5FFFA", // Mint Cream
+  "#FFF5EE", // Seashell
+  "#F0F8FF", // Alice Blue
+  "#F5F5F5", // White Smoke
+  "#FFF8DC", // Cornsilk
+  "#FAF0E6", // Linen
+  "#FAEBD7", // Antique White
+  "#FFFAF0", // Floral White
+  "#FDF5E6", // Old Lace
+];
+
+// Function to get a color based on the team member's name
+function getAvatarColor(name: string): React.CSSProperties {
+  if (name === "Juan Zapardiel") {
+    return { "--avatar-bg": "#F0F8FF" } as React.CSSProperties;
+  }
+  if (name === "Edward Kardouss") {
+    return { "--avatar-bg": "#F5F5DC" } as React.CSSProperties;
+  }
+  return { "--avatar-bg": "#E6E6FA" } as React.CSSProperties; // Default to Lavender for others
 }
 
 export function TeamMemberCard({ member, projects }: TeamMemberCardProps) {
@@ -49,9 +79,11 @@ export function TeamMemberCard({ member, projects }: TeamMemberCardProps) {
       <Card className="h-full overflow-hidden">
         <CardHeader className="pb-2">
           <div className="flex items-center gap-4">
-            <Avatar className="h-14 w-14">
-              <AvatarImage src={member.avatar} alt={member.name} />
-              <AvatarFallback className="text-lg">{initials}</AvatarFallback>
+            <Avatar 
+              className="h-14 w-14 [&>span]:bg-[var(--avatar-bg)]" 
+              style={getAvatarColor(member.name)}
+            >
+              <AvatarFallback className="text-lg text-black">{initials}</AvatarFallback>
             </Avatar>
             <div>
               <CardTitle className="text-xl">{member.name}</CardTitle>
@@ -76,44 +108,69 @@ export function TeamMemberCard({ member, projects }: TeamMemberCardProps) {
             </div>
           </div>
 
-          {/* Project Type Badges */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium">Project Types</h4>
-            <div className="flex flex-wrap gap-2">
-              {projectTypeBadges.map(({ type, count, color }) => (
-                <Badge key={type} className={color}>
-                  {type} ({count})
-                </Badge>
-              ))}
-            </div>
-          </div>
+          <div className="border-t pt-4">
+            {/* Experience Badges Section */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium">Experience Badges</h4>
+              
+              {/* Project Type Badges */}
+              <div className="space-y-2">
+                <h5 className="text-xs font-medium text-muted-foreground">Project Type</h5>
+                <div className="flex flex-wrap gap-2">
+                  {projectTypeBadges
+                    .sort((a, b) => {
+                      // Sort by badge level: Gold (5+), Silver (3-4), Bronze (1-2)
+                      const getLevel = (count: number) => {
+                        if (count >= 5) return 3; // Gold
+                        if (count >= 3) return 2; // Silver
+                        return 1; // Bronze
+                      };
+                      return getLevel(b.count) - getLevel(a.count);
+                    })
+                    .map(({ type, count, color }) => (
+                      <Badge key={type} className={color}>
+                        {type} ({count})
+                      </Badge>
+                    ))}
+                </div>
+              </div>
 
-          {/* Tool Experience */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium">Tools</h4>
-            <div className="flex flex-wrap gap-2">
-              {toolExperience.map(({ tool, projects }) => (
-                <Badge key={tool} variant="outline">
-                  {tool} ({projects})
-                </Badge>
-              ))}
+              {/* Tool Experience */}
+              <div className="space-y-2">
+                <h5 className="text-xs font-medium text-muted-foreground">Tools</h5>
+                <div className="flex flex-wrap gap-2">
+                  {toolExperience
+                    .sort((a, b) => b.projects - a.projects)
+                    .map(({ tool, projects }) => (
+                      <Badge key={tool} variant="outline">
+                        {tool} ({projects})
+                      </Badge>
+                    ))}
+                </div>
+              </div>
+
+              {/* Industries */}
+              <div className="space-y-2">
+                <h5 className="text-xs font-medium text-muted-foreground">Industries</h5>
+                <div className="flex flex-wrap gap-2">
+                  {topIndustries.map(([industry, data]) => (
+                    <Badge 
+                      key={industry} 
+                      className={`${getIndustryColor(industry as Industry)}`}
+                    >
+                      {industry} ({data.projects})
+                    </Badge>
+                  ))}
+                  {Object.entries(metrics.byIndustry).filter(([_, data]) => data.projects > 0).length > 3 && (
+                    <Badge variant="outline" className="text-xs">+more</Badge>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-wrap gap-2 pt-2 border-t">
-          {topIndustries.map(([industry]) => (
-            <Badge 
-              key={industry} 
-              variant="secondary" 
-              className="text-xs"
-              style={{ backgroundColor: getIndustryColor(industry as any) }}
-            >
-              {industry}
-            </Badge>
-          ))}
-          {Object.entries(metrics.byIndustry).filter(([_, data]) => data.projects > 0).length > 3 && (
-            <Badge variant="outline" className="text-xs">+more</Badge>
-          )}
+        <CardFooter className="flex flex-wrap gap-2 pt-2">
+          {/* Remove the industries from footer since they're now in the Experience Badges section */}
         </CardFooter>
       </Card>
     </Link>

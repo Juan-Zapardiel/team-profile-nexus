@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ProjectListItem } from "@/components/ProjectListItem";
 import { ExperienceBadge } from "@/components/ExperienceBadge";
 import { ExperienceChart } from "@/components/ExperienceChart";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { calculateExperienceMetrics, getMonthsBetween } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +32,17 @@ const convertToProjectType = (project: ProjectResponse): Project => {
     description: project.description || undefined
   };
 };
+
+// Function to get a color based on the team member's name
+function getAvatarColor(name: string): React.CSSProperties {
+  if (name === "Juan Zapardiel") {
+    return { "--avatar-bg": "#F0F8FF" } as React.CSSProperties;
+  }
+  if (name === "Edward Kardouss") {
+    return { "--avatar-bg": "#F5F5DC" } as React.CSSProperties;
+  }
+  return { "--avatar-bg": "#E6E6FA" } as React.CSSProperties; // Default to Lavender for others
+}
 
 const ProfilePage = () => {
   const { memberId } = useParams<{ memberId: string }>();
@@ -137,9 +148,11 @@ const ProfilePage = () => {
         {/* Profile Header */}
         <div className="mb-12">
           <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
-            <Avatar className="h-24 w-24">
-              <AvatarImage src={profile.avatar || ""} alt={profile.name} />
-              <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
+            <Avatar 
+              className="h-24 w-24 [&>span]:bg-[var(--avatar-bg)]" 
+              style={getAvatarColor(profile.name)}
+            >
+              <AvatarFallback className="text-2xl text-black">{initials}</AvatarFallback>
             </Avatar>
             
             <div className="space-y-3 flex-1">
@@ -193,8 +206,9 @@ const ProfilePage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(metrics.byType)
                 .filter(([_, data]) => data.projects > 0)
+                .sort((a, b) => b[1].projects - a[1].projects)
                 .map(([type, data]) => {
-                  let badgeColor = "bg-gray-500";
+                  let badgeColor = "bg-amber-700";
                   let badgeText = "Bronze";
                   if (data.projects >= 5) {
                     badgeColor = "bg-yellow-500";

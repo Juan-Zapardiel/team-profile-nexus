@@ -90,43 +90,34 @@ export function formatDate(date: Date): string {
 // Get color for industry
 export function getIndustryColor(industry: Industry): string {
   const colorMap: Record<Industry, string> = {
-    "Technology": "#3b82f6", // blue-500
-    "Healthcare": "#22c55e", // green-500
-    "Financial Services": "#a855f7", // purple-500
-    "Manufacturing": "#f97316", // orange-500
-    "Retail": "#ec4899", // pink-500
-    "Energy": "#eab308", // yellow-500
-    "Education": "#14b8a6", // teal-500
-    "Telecommunications": "#6366f1", // indigo-500
-    "Other": "#6b7280" // gray-500
+    "Technology": "bg-blue-400",
+    "Healthcare": "bg-green-400",
+    "Financial Services": "bg-purple-400",
+    "Manufacturing": "bg-orange-400",
+    "Retail": "bg-pink-400",
+    "Energy": "bg-yellow-400",
+    "Education": "bg-teal-400",
+    "Telecommunications": "bg-indigo-400",
+    "Other": "bg-gray-400"
   };
   
-  return colorMap[industry] || "#6b7280";
+  return colorMap[industry] || "bg-gray-400";
 }
 
 // Get color for project type
 export function getProjectTypeColor(type: ProjectType): string {
-  const colorMap: Record<ProjectType, string> = {
-    "Align and activate": "#10b981", // emerald-500
-    "Right-sizing": "#f59e0b", // amber-500
-    "PMI": "#0ea5e9", // sky-500
-    "Org DD": "#d946ef", // fuchsia-500
-    "TOM implementation": "#f43f5e", // rose-500
-    "Other": "#6b7280" // gray-500
-  };
-  
-  return colorMap[type] || "#6b7280";
+  return "bg-gray-200 text-gray-700"; // Light grey for all project types
 }
 
 // Get color for Humatica tool
 export function getToolColor(tool: HumaticaTool): string {
   const colorMap: Record<HumaticaTool, string> = {
-    "altus": "#2563eb", // blue-600
-    "modas": "#7c3aed", // purple-600
-    "none": "#9ca3af" // gray-400
+    "altus": "bg-blue-400",
+    "modas": "bg-purple-400",
+    "none": "bg-gray-400"
   };
   
-  return colorMap[tool] || "#9ca3af";
+  return colorMap[tool] || "bg-gray-400";
 }
 
 // Calculate experience level based on project count
