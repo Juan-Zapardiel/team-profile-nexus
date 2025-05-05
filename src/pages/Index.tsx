@@ -39,7 +39,7 @@ const Index = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch all profiles
+      // Fetch all profiles - no filtering, this will show all team members
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
@@ -114,10 +114,9 @@ const Index = () => {
             Explore our team's experiences, projects, and skills across various industries and project types.
           </p>
           
-          {/* Admin controls - only show to the first user (assumed admin) */}
           {projectCount === 0 && (
             <div className="mt-6 flex justify-center">
-              <SeedButton />
+              <SeedButton onComplete={fetchData} />
             </div>
           )}
         </header>

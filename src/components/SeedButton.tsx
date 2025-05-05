@@ -5,7 +5,11 @@ import { Loader2 } from "lucide-react";
 import { seedDatabase } from "@/lib/seedDatabase";
 import { useToast } from "@/components/ui/use-toast";
 
-export function SeedButton() {
+interface SeedButtonProps {
+  onComplete?: () => void;
+}
+
+export function SeedButton({ onComplete }: SeedButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -19,6 +23,10 @@ export function SeedButton() {
           title: "Database seeded successfully",
           description: "Sample projects have been added and assigned to team members",
         });
+        
+        if (onComplete) {
+          onComplete();
+        }
       } else {
         toast({
           title: "Error seeding database",

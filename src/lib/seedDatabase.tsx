@@ -62,7 +62,7 @@ const profilesData = [
     name: "Juan Zapardiel",
     job_title: "Consultant B",
     location: "London",
-    email: "juan.zapardiel@example.com",
+    email: "jzapmes4@gmail.com", // Updated to match your email
     avatar: "/placeholder.svg",
     bio: "Experienced consultant specializing in organizational transformation with 32 months of experience."
   },
@@ -114,46 +114,111 @@ export const seedDatabase = async () => {
       .from('profiles')
       .select('*');
     
-    if (!existingProfiles || existingProfiles.length < 4) {
-      // If we need sample profiles, we'd create them here
-      // But in production, you'd create them through authentication
-      console.log("Would insert profiles here if this was just for testing");
+    if (!existingProfiles || existingProfiles.length === 0) {
+      // Get authenticated user's ID if available
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Update the first profile (Juan Zapardiel) with the authenticated user's ID
+        const { data: userProfile, error: userProfileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+          
+        if (!userProfileError && userProfile) {
+          // Update the existing profile with Juan's details
+          await supabase
+            .from('profiles')
+            .update({
+              name: profilesData[0].name,
+              job_title: profilesData[0].job_title,
+              location: profilesData[0].location,
+              bio: profilesData[0].bio
+            })
+            .eq('id', user.id);
+        }
+        
+        // For the remaining profiles, create new users
+        const otherProfiles = profilesData.slice(1);
+        for (const profile of otherProfiles) {
+          const { data: newUser, error: createUserError } = await supabase.auth.admin.createUser({
+            email: profile.email,
+            password: 'password123', // Simple password for demo
+            user_metadata: {
+              name: profile.name,
+              job_title: profile.job_title,
+              location: profile.location
+            }
+          });
+          
+          if (createUserError) {
+            console.error(`Error creating user ${profile.email}:`, createUserError);
+            continue;
+          }
+          
+          if (newUser) {
+            await supabase
+              .from('profiles')
+              .update({ bio: profile.bio })
+              .eq('id', newUser.user.id);
+          }
+        }
+      }
     }
     
     // 4. Distribute projects among team members
     // For demonstration, we'll assign projects based on their experience months
-    if (existingProfiles && existingProfiles.length > 0) {
+    const { data: updatedProfiles } = await supabase
+      .from('profiles')
+      .select('*');
+      
+    if (updatedProfiles && updatedProfiles.length > 0) {
       // Juan (32 months) - assign ~13 projects
+      const juanProfile = updatedProfiles.find(p => p.name === "Juan Zapardiel");
       const juanProjects = insertedProjects.slice(0, 13);
       
       // Edward (4 months) - assign ~2 projects
+      const edwardProfile = updatedProfiles.find(p => p.name === "Edward Kardouss");
       const edwardProjects = insertedProjects.slice(13, 15);
       
       // Oscar (50 months) - assign ~20 projects
+      const oscarProfile = updatedProfiles.find(p => p.name === "Oscar Herrera");
       const oscarProjects = insertedProjects.slice(15, 28);
       
       // Matthias (6 months) - assign ~2 projects
+      const matthiasProfile = updatedProfiles.find(p => p.name === "Matthias Schubert");
       const matthiasProjects = insertedProjects.slice(28, 30);
       
       // Helper function to create team_member_projects entries
       const createTeamMemberProjects = async (profileId: string, projects: any[]) => {
+        if (!profileId) return;
+        
+        // First delete any existing connections for this profile
+        await supabase
+          .from('team_member_projects')
+          .delete()
+          .eq('profile_id', profileId);
+        
         const teamMemberProjects = projects.map(project => ({
           profile_id: profileId,
           project_id: project.id
         }));
         
-        const { error } = await supabase
-          .from('team_member_projects')
-          .insert(teamMemberProjects);
-          
-        if (error) throw error;
+        if (teamMemberProjects.length > 0) {
+          const { error } = await supabase
+            .from('team_member_projects')
+            .insert(teamMemberProjects);
+            
+          if (error) throw error;
+        }
       };
       
       // Assign projects to each team member
-      if (existingProfiles[0]) await createTeamMemberProjects(existingProfiles[0].id, juanProjects);
-      if (existingProfiles[1]) await createTeamMemberProjects(existingProfiles[1].id, edwardProjects);
-      if (existingProfiles[2]) await createTeamMemberProjects(existingProfiles[2].id, oscarProjects);
-      if (existingProfiles[3]) await createTeamMemberProjects(existingProfiles[3].id, matthiasProjects);
+      if (juanProfile) await createTeamMemberProjects(juanProfile.id, juanProjects);
+      if (edwardProfile) await createTeamMemberProjects(edwardProfile.id, edwardProjects);
+      if (oscarProfile) await createTeamMemberProjects(oscarProfile.id, oscarProjects);
+      if (matthiasProfile) await createTeamMemberProjects(matthiasProfile.id, matthiasProjects);
       
       console.log("Projects assigned to team members");
     }
