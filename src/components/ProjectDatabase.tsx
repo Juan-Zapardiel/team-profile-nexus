@@ -3,15 +3,17 @@ import { Project, HumaticaTool } from "@/types";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, getIndustryColor, getProjectTypeColor, getToolColor } from "@/lib/utils";
-import { Plus } from "lucide-react";
+import { Plus, Users, Clock } from "lucide-react";
 import { ProjectFilters } from "./ProjectFilters";
+import { useHarvest } from "@/hooks/useHarvest";
 
 interface ProjectDatabaseProps {
   projects: Project[];
   onAddProject?: () => void;
 }
 
-export function ProjectDatabase({ projects, onAddProject }: ProjectDatabaseProps) {
+export function ProjectDatabase({ projects: initialProjects, onAddProject }: ProjectDatabaseProps) {
+  const { projects: harvestProjects, loading, error } = useHarvest();
   const [filters, setFilters] = useState({
     search: "",
     industries: [] as string[],
@@ -20,8 +22,15 @@ export function ProjectDatabase({ projects, onAddProject }: ProjectDatabaseProps
     years: [] as string[],
   });
 
+  // Merge initial projects with Harvest projects
+  const allProjects = useMemo(() => {
+    const harvestProjectIds = new Set(harvestProjects.map(p => p.id));
+    const uniqueInitialProjects = initialProjects.filter(p => !harvestProjectIds.has(p.id));
+    return [...harvestProjects, ...uniqueInitialProjects];
+  }, [initialProjects, harvestProjects]);
+
   const filteredProjects = useMemo(() => {
-    return projects.filter(project => {
+    return allProjects.filter(project => {
       // Search filter
       if (filters.search && !project.name.toLowerCase().includes(filters.search.toLowerCase())) {
         return false;
@@ -52,61 +61,101 @@ export function ProjectDatabase({ projects, onAddProject }: ProjectDatabaseProps
 
       return true;
     });
-  }, [projects, filters]);
+  }, [allProjects, filters]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-semibold">Project Database</h2>
-      
-      <ProjectFilters 
-        projects={projects}
-        onFilterChange={setFilters}
-      />
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-semibold">Project Database</h2>
+        {onAddProject && (
+          <button
+            onClick={onAddProject}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            Add Project
+          </button>
+        )}
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card 
-          className="overflow-hidden border-dashed border-2 hover:border-primary/50 cursor-pointer transition-colors min-h-[200px] flex items-center justify-center"
-          onClick={onAddProject}
-        >
-          <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-            <Plus className="h-12 w-12 text-muted-foreground mb-2" />
-            <p className="text-lg font-medium text-muted-foreground">Add New Project</p>
-          </CardContent>
-        </Card>
+      {error && (
+        <div className="mb-4 p-4 bg-destructive/10 text-destructive rounded-md">
+          <p className="font-medium">Error loading Harvest data:</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
 
-        {filteredProjects.map((project) => (
-          <Card key={project.id} className="overflow-hidden">
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-start">
-                <h3 className="font-medium text-lg">{project.name}</h3>
-                <span className="text-sm text-muted-foreground whitespace-nowrap">
-                  {formatDate(project.startDate)} - {formatDate(project.endDate)}
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex gap-2 flex-wrap">
-                  <Badge className={`${getIndustryColor(project.industry)}`}>
-                    {project.industry}
-                  </Badge>
-                  <Badge className={`${getProjectTypeColor(project.type)}`}>
-                    {project.type}
-                  </Badge>
-                  {project.tools.filter(tool => tool !== "none").map(tool => (
-                    <Badge key={tool} className={`${getToolColor(tool)}`}>
-                      {tool}
+      <ProjectFilters projects={allProjects} onFilterChange={setFilters} />
+
+      <div className="grid gap-6 mt-6">
+        {filteredProjects.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            No projects found. {error ? "Harvest integration is not available." : "Try adjusting your filters."}
+          </div>
+        ) : (
+          filteredProjects.map((project) => (
+            <Card key={project.id}>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">{project.name}</h3>
+                  <div className="flex gap-2 mt-2">
+                    <Badge variant="outline" className={getIndustryColor(project.industry)}>
+                      {project.industry}
                     </Badge>
-                  ))}
+                    <Badge variant="outline" className={getProjectTypeColor(project.type)}>
+                      {project.type}
+                    </Badge>
+                    {project.tools.map((tool) => (
+                      <Badge key={tool} variant="outline" className={getToolColor(tool)}>
+                        {tool}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-                
-                {project.description && (
-                  <p className="text-sm text-muted-foreground">{project.description}</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  {project.teamMembers && project.teamMembers.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      <span>{project.teamMembers.length} members</span>
+                    </div>
+                  )}
+                  {project.totalHours && (
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      <span>{project.totalHours.toFixed(1)} hours</span>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-muted-foreground">
+                  <p>Duration: {formatDate(project.startDate)} - {formatDate(project.endDate)}</p>
+                  {project.description && <p className="mt-2">{project.description}</p>}
+                  {project.teamMembers && project.teamMembers.length > 0 && (
+                    <div className="mt-4">
+                      <p className="font-medium mb-2">Team Members:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {project.teamMembers.map((member) => (
+                          <Badge key={member} variant="secondary">
+                            {member}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );

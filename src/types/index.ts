@@ -28,6 +28,8 @@ export interface Project {
   type: ProjectType;
   tools: HumaticaTool[];
   description?: string;
+  teamMembers?: string[];
+  totalHours?: number;
 }
 
 export interface TeamMember {
