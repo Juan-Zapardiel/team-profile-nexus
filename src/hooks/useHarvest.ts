@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { getHarvestClient } from '@/integrations/harvest/client';
 import { convertHarvestProject, getProjectTeamMembers, getProjectTotalHours } from '@/lib/harvestUtils';
 import { Project } from '@/types';
 import { useToast } from '@/components/ui/use-toast';
@@ -22,43 +21,14 @@ export const useHarvest = (): UseHarvestReturn => {
       setLoading(true);
       setError(null);
 
-      let harvest;
-      try {
-        harvest = getHarvestClient();
-      } catch (err) {
-        // If client is not initialized, return empty projects
-        setProjects([]);
-        setLoading(false);
-        return;
-      }
-
-      const harvestProjects = await harvest.getProjects();
-      
-      // Get time entries for the last 12 months
-      const endDate = new Date().toISOString().split('T')[0];
-      const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - 12);
-      const timeEntries = await harvest.getTimeEntries(
-        startDate.toISOString().split('T')[0],
-        endDate
-      );
+      // Fetch projects from the backend proxy
+      const response = await fetch('http://localhost:3001/api/harvest/projects');
+      if (!response.ok) throw new Error('Failed to fetch projects from backend proxy');
+      const data = await response.json();
+      const harvestProjects = data.projects || [];
 
       // Convert Harvest projects to our format
-      const convertedProjects = harvestProjects.map(harvestProject => {
-        const projectTimeEntries = timeEntries.filter(
-          entry => entry.project.id === harvestProject.id
-        );
-        
-        const project = convertHarvestProject(harvestProject);
-        
-        // Add team members and hours information
-        return {
-          ...project,
-          teamMembers: getProjectTeamMembers(projectTimeEntries),
-          totalHours: getProjectTotalHours(projectTimeEntries)
-        };
-      });
-
+      const convertedProjects = harvestProjects.map(convertHarvestProject);
       setProjects(convertedProjects);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch Harvest projects';

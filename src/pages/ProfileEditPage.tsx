@@ -266,11 +266,19 @@ const ProfileEditPage = () => {
                     <Input
                       id="name"
                       value={profile.name}
-                      onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                      required
+                      readOnly
+                      disabled
                     />
                   </div>
-
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      value={profile.email}
+                      readOnly
+                      disabled
+                    />
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="jobTitle">Job Title</Label>
                     <Input
@@ -280,7 +288,6 @@ const ProfileEditPage = () => {
                       required
                     />
                   </div>
-
                   <div className="grid gap-2">
                     <Label htmlFor="location">Location</Label>
                     <Input
@@ -290,7 +297,6 @@ const ProfileEditPage = () => {
                       required
                     />
                   </div>
-
                   <div className="grid gap-2">
                     <Label htmlFor="bio">Bio</Label>
                     <Textarea
@@ -301,7 +307,6 @@ const ProfileEditPage = () => {
                       rows={4}
                     />
                   </div>
-
                   <div className="grid gap-2">
                     <Label htmlFor="startDate">Start Date</Label>
                     <Input
