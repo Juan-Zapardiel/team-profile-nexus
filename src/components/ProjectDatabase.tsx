@@ -1,162 +1,212 @@
 import { useState, useMemo } from "react";
-import { Project, HumaticaTool } from "@/types";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatDate, getIndustryColor, getProjectTypeColor, getToolColor } from "@/lib/utils";
-import { Plus, Users, Clock } from "lucide-react";
-import { ProjectFilters } from "./ProjectFilters";
-import { useHarvest } from "@/hooks/useHarvest";
+import { Plus, RefreshCw, Search, Bug } from "lucide-react";
+import { Project } from "@/types";
+import { formatDate } from "@/lib/utils";
+import { syncHarvestProjects } from "@/lib/syncHarvestProjects";
+import { useToast } from "@/components/ui/use-toast";
+import { debugProject } from "@/lib/debugProject";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ProjectDatabaseProps {
   projects: Project[];
-  onAddProject?: () => void;
+  onAddProject: () => void;
+  onRefresh: () => void;
 }
 
-export function ProjectDatabase({ projects: initialProjects, onAddProject }: ProjectDatabaseProps) {
-  const { projects: harvestProjects, loading, error } = useHarvest();
-  const [filters, setFilters] = useState({
-    search: "",
-    industries: [] as string[],
-    types: [] as string[],
-    tools: [] as HumaticaTool[],
-    years: [] as string[],
-  });
+export const ProjectDatabase = ({ projects, onAddProject, onRefresh }: ProjectDatabaseProps) => {
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [industryFilter, setIndustryFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const { toast } = useToast();
 
-  // Merge initial projects with Harvest projects
-  const allProjects = useMemo(() => {
-    const harvestProjectIds = new Set(harvestProjects.map(p => p.id));
-    const uniqueInitialProjects = initialProjects.filter(p => !harvestProjectIds.has(p.id));
-    return [...harvestProjects, ...uniqueInitialProjects];
-  }, [initialProjects, harvestProjects]);
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await syncHarvestProjects();
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: result.message,
+        });
+        onRefresh();
+      } else {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to sync projects",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDebug = async (projectName: string) => {
+    try {
+      await debugProject(projectName);
+      toast({
+        title: "Debug Info",
+        description: "Check the browser console for project details",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to debug project",
+        variant: "destructive",
+      });
+    }
+  };
 
   const filteredProjects = useMemo(() => {
-    return allProjects.filter(project => {
-      // Search filter
-      if (filters.search && !project.name.toLowerCase().includes(filters.search.toLowerCase())) {
-        return false;
-      }
-
-      // Industry filter
-      if (filters.industries.length > 0 && !filters.industries.includes(project.industry)) {
-        return false;
-      }
-
-      // Type filter
-      if (filters.types.length > 0 && !filters.types.includes(project.type)) {
-        return false;
-      }
-
-      // Tool filter
-      if (filters.tools.length > 0 && !filters.tools.some(tool => project.tools.includes(tool))) {
-        return false;
-      }
-
-      // Year filter
-      if (filters.years.length > 0) {
-        const projectYear = new Date(project.startDate).getFullYear().toString();
-        if (!filters.years.includes(projectYear)) {
-          return false;
-        }
-      }
-
-      return true;
+    return projects.filter(project => {
+      const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        project.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesIndustry = industryFilter === "all" || project.industry === industryFilter;
+      const matchesType = typeFilter === "all" || project.type === typeFilter;
+      return matchesSearch && matchesIndustry && matchesType;
     });
-  }, [allProjects, filters]);
+  }, [projects, searchQuery, industryFilter, typeFilter]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  const industries = ["all", ...new Set(projects.map(p => p.industry))];
+  const types = ["all", ...new Set(projects.map(p => p.type))];
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold">Project Database</h2>
-        {onAddProject && (
-          <button
-            onClick={onAddProject}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Projects</h2>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleSync}
+            disabled={isSyncing}
           >
-            <Plus className="h-4 w-4" />
+            {isSyncing ? (
+              <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            Sync with Harvest
+          </Button>
+          <Button onClick={onAddProject}>
+            <Plus className="h-4 w-4 mr-2" />
             Add Project
-          </button>
-        )}
+          </Button>
+        </div>
       </div>
 
-      {error && (
-        <div className="mb-4 p-4 bg-destructive/10 text-destructive rounded-md">
-          <p className="font-medium">Error loading Harvest data:</p>
-          <p className="text-sm">{error}</p>
+      <div className="flex gap-4 items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search projects..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8"
+          />
         </div>
-      )}
+        <Select value={industryFilter} onValueChange={setIndustryFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Industry" />
+          </SelectTrigger>
+          <SelectContent>
+            {industries.map(industry => (
+              <SelectItem key={industry} value={industry}>
+                {industry === "all" ? "All Industries" : industry}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            {types.map(type => (
+              <SelectItem key={type} value={type}>
+                {type === "all" ? "All Types" : type}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      <ProjectFilters projects={allProjects} onFilterChange={setFilters} />
-
-      <div className="grid gap-6 mt-6">
-        {filteredProjects.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            No projects found. {error ? "Harvest integration is not available." : "Try adjusting your filters."}
-          </div>
-        ) : (
-          filteredProjects.map((project) => (
-            <Card key={project.id}>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold">{project.name}</h3>
-                  <div className="flex gap-2 mt-2">
-                    <Badge variant="outline" className={getIndustryColor(project.industry)}>
-                      {project.industry}
-                    </Badge>
-                    <Badge variant="outline" className={getProjectTypeColor(project.type)}>
-                      {project.type}
-                    </Badge>
-                    {project.tools.map((tool) => (
-                      <Badge key={tool} variant="outline" className={getToolColor(tool)}>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>Industry</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Tools</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredProjects.map((project) => (
+              <TableRow key={project.id}>
+                <TableCell className="font-medium">{project.name}</TableCell>
+                <TableCell>
+                  {formatDate(project.startDate)} - {formatDate(project.endDate)}
+                </TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{project.industry}</Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{project.type}</Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    {project.tools.filter(tool => tool !== "none").map(tool => (
+                      <Badge key={tool} variant="outline">
                         {tool}
                       </Badge>
                     ))}
                   </div>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  {project.teamMembers && project.teamMembers.length > 0 && (
-                    <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      <span>{project.teamMembers.length} members</span>
-                    </div>
-                  )}
-                  {project.totalHours && (
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>{project.totalHours.toFixed(1)} hours</span>
-                    </div>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">
-                  <p>Duration: {formatDate(project.startDate)} - {formatDate(project.endDate)}</p>
-                  {project.description && <p className="mt-2">{project.description}</p>}
-                  {project.teamMembers && project.teamMembers.length > 0 && (
-                    <div className="mt-4">
-                      <p className="font-medium mb-2">Team Members:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {project.teamMembers.map((member) => (
-                          <Badge key={member} variant="secondary">
-                            {member}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {project.description}
+                </TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDebug(project.name)}
+                  >
+                    <Bug className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
-} 
+}; 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getUsers } from '@/integrations/harvest/client';
 
 export interface HarvestUser {
   id: number;
@@ -24,10 +25,8 @@ export const useHarvestUsers = (): UseHarvestUsersReturn => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('http://localhost:3001/api/harvest/users');
-      if (!response.ok) throw new Error('Failed to fetch Harvest users');
-      const data = await response.json();
-      setUsers(data.users || []);
+      const harvestUsers = await getUsers();
+      setUsers(harvestUsers || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch Harvest users');
     } finally {

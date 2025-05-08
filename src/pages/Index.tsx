@@ -42,6 +42,16 @@ const Index = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
+      if (!user) {
+        toast({
+          title: "Authentication required",
+          description: "Please sign in to view team data",
+          variant: "destructive"
+        });
+        navigate('/login');
+        return;
+      }
+
       // Fetch all profiles - no filtering, this will show all team members
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
@@ -59,7 +69,8 @@ const Index = () => {
       // Fetch all projects
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
-        .select('*');
+        .select('*')
+        .order('start_date', { ascending: false });
 
       if (projectsError) throw projectsError;
 
@@ -163,6 +174,7 @@ const Index = () => {
           <ProjectDatabase 
             projects={allProjects} 
             onAddProject={handleAddProject}
+            onRefresh={fetchData}
           />
         </section>
       </div>

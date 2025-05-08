@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { convertHarvestProject, getProjectTeamMembers, getProjectTotalHours } from '@/lib/harvestUtils';
 import { Project } from '@/types';
 import { useToast } from '@/components/ui/use-toast';
+import { getProjects } from '@/integrations/harvest/client';
 
 interface UseHarvestReturn {
   projects: Project[];
@@ -21,11 +22,8 @@ export const useHarvest = (): UseHarvestReturn => {
       setLoading(true);
       setError(null);
 
-      // Fetch projects from the backend proxy
-      const response = await fetch('http://localhost:3001/api/harvest/projects');
-      if (!response.ok) throw new Error('Failed to fetch projects from backend proxy');
-      const data = await response.json();
-      const harvestProjects = data.projects || [];
+      // Fetch projects directly using the Harvest client
+      const harvestProjects = await getProjects();
 
       // Convert Harvest projects to our format
       const convertedProjects = harvestProjects.map(convertHarvestProject);

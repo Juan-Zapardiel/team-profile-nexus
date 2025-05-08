@@ -52,6 +52,16 @@ const ProfileEditPage = () => {
 
     const loadProfile = async () => {
       try {
+        if (!user) {
+          toast({
+            title: "Authentication required",
+            description: "Please sign in to edit your profile",
+            variant: "destructive"
+          });
+          navigate('/login');
+          return;
+        }
+
         // Fetch profile
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
@@ -118,11 +128,21 @@ const ProfileEditPage = () => {
     };
 
     loadProfile();
-  }, [user, toast]);
+  }, [user, toast, navigate]);
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile || !user) return;
+
+    // Add check to ensure user is editing their own profile
+    if (profile.id !== user.id) {
+      toast({
+        title: "Unauthorized",
+        description: "You can only edit your own profile",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setSaving(true);
     try {

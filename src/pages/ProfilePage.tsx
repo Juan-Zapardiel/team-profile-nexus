@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ProjectListItem } from "@/components/ProjectListItem";
 import { ExperienceBadge } from "@/components/ExperienceBadge";
@@ -14,6 +14,7 @@ import { Tables } from "@/integrations/supabase/types";
 import { useToast } from "@/components/ui/use-toast";
 import { Project } from "@/types";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/context/AuthContext";
 
 type Profile = Tables<"profiles">;
 type ProjectResponse = Tables<"projects">;
@@ -50,12 +51,24 @@ const ProfilePage = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   
   useEffect(() => {
     const fetchProfileAndProjects = async () => {
       if (!memberId) return;
 
       try {
+        if (!user) {
+          toast({
+            title: "Authentication required",
+            description: "Please sign in to view profile data",
+            variant: "destructive"
+          });
+          navigate('/login');
+          return;
+        }
+
         // Fetch the profile
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
@@ -103,7 +116,7 @@ const ProfilePage = () => {
     };
     
     fetchProfileAndProjects();
-  }, [memberId, toast]);
+  }, [memberId, toast, navigate]);
   
   if (isLoading) {
     return (

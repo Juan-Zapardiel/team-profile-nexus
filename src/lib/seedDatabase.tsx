@@ -94,6 +94,12 @@ const profilesData = [
 // Function to seed the database
 export const seedDatabase = async () => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error("Authentication required to seed database");
+    }
+
     // 1. Generate project data
     const projectsData = generateProjects(30);
     
@@ -110,14 +116,6 @@ export const seedDatabase = async () => {
     console.log(`Inserted ${insertedProjects?.length || 0} projects`);
     
     // 3. Create or update profiles
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      console.log("No authenticated user found");
-      throw new Error("No authenticated user found");
-    }
-
-    // First, ensure all profiles exist
     for (const profileData of profilesData) {
       // Check if profile exists
       const { data: existingProfile } = await supabase
