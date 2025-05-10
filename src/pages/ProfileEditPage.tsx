@@ -15,13 +15,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Tables } from "@/integrations/supabase/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Project, Industry, ProjectType } from "@/types";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { getMonthsBetween } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type Profile = Tables<"profiles">;
 type ProjectResponse = Tables<"projects">;
@@ -209,6 +220,44 @@ const ProfileEditPage = () => {
     } catch (error: any) {
       toast({
         title: "Error updating projects",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteProfile = async () => {
+    if (!user) return;
+
+    try {
+      // Delete team member projects first
+      const { error: projectsError } = await supabase
+        .from("team_member_projects")
+        .delete()
+        .eq("profile_id", user.id);
+
+      if (projectsError) throw projectsError;
+
+      // Delete the profile
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", user.id);
+
+      if (profileError) throw profileError;
+
+      // Sign out the user
+      await supabase.auth.signOut();
+
+      toast({
+        title: "Profile deleted",
+        description: "Your profile has been successfully deleted.",
+      });
+
+      navigate("/auth");
+    } catch (error: any) {
+      toast({
+        title: "Error deleting profile",
         description: error.message,
         variant: "destructive",
       });
@@ -435,6 +484,43 @@ const ProfileEditPage = () => {
                     </SheetContent>
                   </Sheet>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="mt-8 border-destructive">
+              <CardHeader>
+                <CardTitle className="text-destructive">Danger Zone</CardTitle>
+                <CardDescription>
+                  Once you delete your profile, there is no going back. Please be certain.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="w-full">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Profile
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete your profile
+                        and remove all associated data from our servers.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDeleteProfile}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Delete Profile
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </CardContent>
             </Card>
           </div>

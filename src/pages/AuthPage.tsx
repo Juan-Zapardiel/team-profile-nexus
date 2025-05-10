@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,19 +9,64 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2 } from "lucide-react";
+import { Loader2, Lock, Check, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { getUsers } from "@/integrations/harvest/client";
+import { HarvestUser } from "@/integrations/harvest/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+// Password requirements regex
+const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&+\-])[A-Za-z\d@$!%*#?&+\-]{6,}$/;
 
 const authFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  password: z.string()
+    .min(6, { message: "Password must be at least 6 characters" })
+    .regex(PASSWORD_REGEX, { 
+      message: "Password must contain at least one letter, one number, and one special character" 
+    }),
+  confirmPassword: z.string().optional()
+}).refine((data) => {
+  // Only validate password confirmation if we're in signup mode
+  if (data.confirmPassword) {
+    return data.password === data.confirmPassword;
+  }
+  return true;
+}, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 type AuthFormValues = z.infer<typeof authFormSchema>;
 
+const PasswordRequirement = ({ met, text }: { met: boolean; text: string }) => (
+  <div className="flex items-center gap-2 text-sm">
+    {met ? (
+      <Check className="h-4 w-4 text-green-500" />
+    ) : (
+      <X className="h-4 w-4 text-red-500" />
+    )}
+    <span className={met ? "text-green-500" : "text-red-500"}>{text}</span>
+  </div>
+);
+
 const AuthPage = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isCheckingHarvest, setIsCheckingHarvest] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [harvestUsers, setHarvestUsers] = useState<HarvestUser[]>([]);
+  const [showSignupDialog, setShowSignupDialog] = useState(false);
+  const [unregisteredEmail, setUnregisteredEmail] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -30,32 +75,91 @@ const AuthPage = () => {
     defaultValues: {
       email: "",
       password: "",
+      confirmPassword: "",
     },
+    mode: "onChange",
   });
 
+  const password = form.watch("password");
+  const passwordRequirements = {
+    length: password.length >= 6,
+    letter: /[A-Za-z]/.test(password),
+    number: /\d/.test(password),
+    special: /[@$!%*#?&+\-]/.test(password),
+  };
+
+  // Fetch Harvest users on component mount
+  useEffect(() => {
+    const fetchHarvestUsers = async () => {
+      try {
+        const users = await getUsers();
+        setHarvestUsers(users);
+      } catch (error) {
+        console.error("Error fetching Harvest users:", error);
+      }
+    };
+    fetchHarvestUsers();
+  }, []);
+
+  const isHarvestEmail = (email: string) => {
+    return harvestUsers.some(user => user.email.toLowerCase() === email.toLowerCase());
+  };
+
   const onSubmit = async (data: AuthFormValues) => {
+    console.log('Form submitted:', { data, authMode });
     setIsLoading(true);
     try {
       if (authMode === "login") {
+        console.log('Attempting login...');
         const { error } = await supabase.auth.signInWithPassword({
           email: data.email,
           password: data.password,
         });
 
-        if (error) throw error;
+        console.log('Login response:', { error });
+
+        if (error) {
+          if (error.message.includes("Invalid login credentials")) {
+            // Check if the email exists in Harvest
+            if (isHarvestEmail(data.email)) {
+              setUnregisteredEmail(data.email);
+              setShowSignupDialog(true);
+            } else {
+              throw new Error("This email is not associated with any Harvest account");
+            }
+          } else {
+            throw error;
+          }
+          return;
+        }
 
         toast({
           title: "Login successful",
           description: "Welcome back!",
         });
         navigate("/");
-      } else {
+      } else if (authMode === "signup") {
+        // Check if email is a Harvest email
+        setIsCheckingHarvest(true);
+        if (!isHarvestEmail(data.email)) {
+          throw new Error("This email is not associated with any Harvest account");
+        }
+        setIsCheckingHarvest(false);
+
+        // Find the Harvest user to get their full name
+        const harvestUser = harvestUsers.find(user => user.email.toLowerCase() === data.email.toLowerCase());
+        if (!harvestUser) {
+          throw new Error("Could not find Harvest user details");
+        }
+
         const { error } = await supabase.auth.signUp({
           email: data.email,
           password: data.password,
           options: {
             data: {
-              name: "New User",
+              name: harvestUser.first_name && harvestUser.last_name 
+                ? `${harvestUser.first_name} ${harvestUser.last_name}`
+                : harvestUser.first_name || harvestUser.last_name || "New User",
               job_title: "Team Member",
               location: "Unknown",
             },
@@ -70,6 +174,7 @@ const AuthPage = () => {
         });
       }
     } catch (error: any) {
+      console.error('Authentication error:', error);
       toast({
         title: "Authentication error",
         description: error.message || "An error occurred during authentication",
@@ -77,7 +182,48 @@ const AuthPage = () => {
       });
     } finally {
       setIsLoading(false);
+      setIsCheckingHarvest(false);
     }
+  };
+
+  const handleForgotPassword = async () => {
+    const email = form.getValues("email");
+    if (!email) {
+      toast({
+        title: "Error",
+        description: "Please enter your email address first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsResettingPassword(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth?mode=reset`,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Password reset email sent",
+        description: "Please check your email for the password reset link.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send password reset email",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  const handleSignupFromDialog = () => {
+    setShowSignupDialog(false);
+    setAuthMode("signup");
+    form.setValue("email", unregisteredEmail);
   };
 
   return (
@@ -128,7 +274,7 @@ const AuthPage = () => {
                     )}
                   />
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex flex-col gap-4">
                   <Button className="w-full" type="submit" disabled={isLoading}>
                     {isLoading ? (
                       <>
@@ -136,6 +282,23 @@ const AuthPage = () => {
                       </>
                     ) : (
                       "Sign In"
+                    )}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    className="w-full text-sm text-muted-foreground hover:text-primary"
+                    onClick={handleForgotPassword}
+                    disabled={isResettingPassword}
+                  >
+                    {isResettingPassword ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending Reset Link
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="mr-2 h-4 w-4" /> Forgot Password?
+                      </>
                     )}
                   </Button>
                 </CardFooter>
@@ -169,14 +332,45 @@ const AuthPage = () => {
                         <FormControl>
                           <Input type="password" placeholder="••••••••" {...field} />
                         </FormControl>
+                        <div className="mt-2 space-y-1">
+                          <PasswordRequirement 
+                            met={passwordRequirements.length} 
+                            text="At least 6 characters" 
+                          />
+                          <PasswordRequirement 
+                            met={passwordRequirements.letter} 
+                            text="At least one letter" 
+                          />
+                          <PasswordRequirement 
+                            met={passwordRequirements.number} 
+                            text="At least one number" 
+                          />
+                          <PasswordRequirement 
+                            met={passwordRequirements.special} 
+                            text="At least one special character (@$!%*#?&+-)" 
+                          />
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="••••••••" {...field} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full" type="submit" disabled={isLoading}>
-                    {isLoading ? (
+                  <Button className="w-full" type="submit" disabled={isLoading || isCheckingHarvest}>
+                    {isLoading || isCheckingHarvest ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating Account
                       </>
@@ -190,6 +384,24 @@ const AuthPage = () => {
           </TabsContent>
         </Tabs>
       </Card>
+
+      <AlertDialog open={showSignupDialog} onOpenChange={setShowSignupDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Account Not Found</AlertDialogTitle>
+            <AlertDialogDescription>
+              This email is associated with a Harvest account but hasn't been registered yet.
+              Would you like to create an account?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSignupFromDialog}>
+              Create Account
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
