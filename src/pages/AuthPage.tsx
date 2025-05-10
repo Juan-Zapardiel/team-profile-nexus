@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Lock, Check, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { getUsers } from "@/integrations/harvest/client";
+import { getUsers, getUserFirstTimeEntryDate } from "@/integrations/harvest/client";
 import { HarvestUser } from "@/integrations/harvest/client";
 import {
   AlertDialog,
@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { createClient } from '@supabase/supabase-js';
 
 // Password requirements regex
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&+\-])[A-Za-z\d@$!%*#?&+\-]{6,}$/;
@@ -70,6 +71,19 @@ const AuthPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Create the admin client inside the component with a unique storage key
+  const supabaseAdmin = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        storageKey: 'supabase.admin'
+      }
+    }
+  );
+
   const form = useForm<AuthFormValues>({
     resolver: zodResolver(authFormSchema),
     defaultValues: {
@@ -106,7 +120,6 @@ const AuthPage = () => {
   };
 
   const onSubmit = async (data: AuthFormValues) => {
-    console.log('Form submitted:', { data, authMode });
     setIsLoading(true);
     try {
       if (authMode === "login") {
@@ -146,35 +159,120 @@ const AuthPage = () => {
         }
         setIsCheckingHarvest(false);
 
-        // Find the Harvest user to get their full name
+        // Find the Harvest user to get their full name and ID
         const harvestUser = harvestUsers.find(user => user.email.toLowerCase() === data.email.toLowerCase());
         if (!harvestUser) {
           throw new Error("Could not find Harvest user details");
         }
 
-        const { error } = await supabase.auth.signUp({
+        console.log('Found Harvest user:', {
+          id: harvestUser.id,
+          name: `${harvestUser.first_name} ${harvestUser.last_name}`,
+          email: harvestUser.email
+        });
+
+        // Get the user's first time entry date
+        const firstTimeEntryDate = await getUserFirstTimeEntryDate(harvestUser.id);
+        console.log('First time entry date:', firstTimeEntryDate);
+
+        if (!firstTimeEntryDate) {
+          throw new Error("No time entries found for this user in Harvest");
+        }
+
+        const userData = {
+          name: harvestUser.first_name && harvestUser.last_name 
+            ? `${harvestUser.first_name} ${harvestUser.last_name}`
+            : harvestUser.first_name || harvestUser.last_name || "New User",
+          job_title: "Team Member",
+          location: "Unknown",
+          start_date: firstTimeEntryDate,
+        };
+
+        console.log('Creating user with data:', userData);
+
+        // Sign up the user
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: data.email,
           password: data.password,
           options: {
-            data: {
-              name: harvestUser.first_name && harvestUser.last_name 
-                ? `${harvestUser.first_name} ${harvestUser.last_name}`
-                : harvestUser.first_name || harvestUser.last_name || "New User",
-              job_title: "Team Member",
-              location: "Unknown",
-            },
+            data: userData,
+            emailRedirectTo: `${window.location.origin}/auth?mode=confirm`,
           },
         });
 
-        if (error) throw error;
+        if (signUpError) {
+          console.error('Signup error:', signUpError);
+          throw signUpError;
+        }
+        
+        if (!signUpData.user) {
+          console.error('No user data returned from signup');
+          throw new Error("No user data returned from signup");
+        }
+
+        console.log('User created:', signUpData.user.id);
+
+        // Check if profile already exists
+        const { data: existingProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('id', signUpData.user.id)
+          .single();
+
+        if (existingProfile) {
+          console.log('Profile already exists, updating...');
+          // Update existing profile
+          const { error: updateError } = await supabaseAdmin
+            .from('profiles')
+            .update({
+              email: data.email,
+              start_date: firstTimeEntryDate,
+              name: userData.name,
+              job_title: userData.job_title,
+              location: userData.location
+            })
+            .eq('id', signUpData.user.id);
+
+          if (updateError) {
+            console.error('Error updating profile:', updateError);
+            throw new Error(`Failed to update user profile: ${updateError.message}`);
+          }
+        } else {
+          // Create new profile
+          const { error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .insert({
+              id: signUpData.user.id,
+              email: data.email,
+              start_date: firstTimeEntryDate,
+              name: userData.name,
+              job_title: userData.job_title,
+              location: userData.location
+            });
+
+          if (profileError) {
+            console.error('Error creating profile:', profileError);
+            // If profile creation fails, we should clean up the auth user
+            await supabase.auth.admin.deleteUser(signUpData.user.id);
+            throw new Error(`Failed to create user profile: ${profileError.message}`);
+          }
+        }
+
+        console.log('Profile created/updated successfully');
 
         toast({
           title: "Registration successful",
-          description: "Please check your email to verify your account.",
+          description: "Please check your email to verify your account. You will be redirected to the login page.",
         });
+
+        // Wait a moment before redirecting to login
+        setTimeout(() => {
+          setAuthMode("login");
+          form.reset();
+        }, 3000);
       }
     } catch (error: any) {
-      console.error('Authentication error:', error);
+      console.error('Signup error:', error);
       toast({
         title: "Authentication error",
         description: error.message || "An error occurred during authentication",

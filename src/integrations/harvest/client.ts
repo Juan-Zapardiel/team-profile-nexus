@@ -195,4 +195,75 @@ export const getProjectDetails = async (projectId: number): Promise<{
     console.error(`Error fetching project details for ${projectId}:`, error);
     throw error;
   }
+};
+
+export const getUserTimeEntries = async (userId: number): Promise<HarvestTimeEntry[]> => {
+  try {
+    console.log(`Fetching time entries for user ${userId}...`);
+    let allTimeEntries: HarvestTimeEntry[] = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await harvestClient.get('/time_entries', {
+        params: {
+          user_id: userId,
+          page: page,
+          per_page: 100
+        }
+      });
+
+      const entries = response.data.time_entries;
+      allTimeEntries = [...allTimeEntries, ...entries];
+      
+      console.log(`Fetched page ${page}: ${entries.length} entries`);
+      
+      // Check if we have more pages
+      hasMore = entries.length === 100;
+      page++;
+    }
+
+    console.log(`Total time entries found for user ${userId}: ${allTimeEntries.length}`);
+    if (allTimeEntries.length > 0) {
+      console.log('Sample entries:', allTimeEntries.slice(0, 3).map(entry => ({
+        date: entry.spent_date,
+        project: entry.project.name,
+        hours: entry.hours
+      })));
+    }
+
+    return allTimeEntries;
+  } catch (error) {
+    console.error(`Error fetching time entries for user ${userId}:`, error);
+    throw error;
+  }
+};
+
+export const getUserFirstTimeEntryDate = async (userId: number): Promise<string | null> => {
+  try {
+    const timeEntries = await getUserTimeEntries(userId);
+    
+    if (timeEntries.length === 0) {
+      console.log(`No time entries found for user ${userId}`);
+      return null;
+    }
+
+    // Sort time entries by date and get the earliest one
+    const sortedEntries = timeEntries.sort((a, b) => 
+      new Date(a.spent_date).getTime() - new Date(b.spent_date).getTime()
+    );
+
+    const firstEntry = sortedEntries[0];
+    console.log(`First time entry found for user ${userId}:`, {
+      date: firstEntry.spent_date,
+      project: firstEntry.project.name,
+      hours: firstEntry.hours,
+      user: firstEntry.user.name
+    });
+
+    return firstEntry.spent_date;
+  } catch (error) {
+    console.error(`Error getting first time entry date for user ${userId}:`, error);
+    throw error;
+  }
 }; 
