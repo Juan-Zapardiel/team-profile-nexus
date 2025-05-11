@@ -23,7 +23,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { createClient } from '@supabase/supabase-js';
 
 // Password requirements regex
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&+\-])[A-Za-z\d@$!%*#?&+\-]{6,}$/;
@@ -70,19 +69,6 @@ const AuthPage = () => {
   const [unregisteredEmail, setUnregisteredEmail] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  // Create the admin client inside the component with a unique storage key
-  const supabaseAdmin = createClient(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        storageKey: 'supabase.admin'
-      }
-    }
-  );
 
   const form = useForm<AuthFormValues>({
     resolver: zodResolver(authFormSchema),
@@ -211,54 +197,6 @@ const AuthPage = () => {
         }
 
         console.log('User created:', signUpData.user.id);
-
-        // Check if profile already exists
-        const { data: existingProfile } = await supabaseAdmin
-          .from('profiles')
-          .select('id')
-          .eq('id', signUpData.user.id)
-          .single();
-
-        if (existingProfile) {
-          console.log('Profile already exists, updating...');
-          // Update existing profile
-          const { error: updateError } = await supabaseAdmin
-            .from('profiles')
-            .update({
-              email: data.email,
-              start_date: firstTimeEntryDate,
-              name: userData.name,
-              job_title: userData.job_title,
-              location: userData.location
-            })
-            .eq('id', signUpData.user.id);
-
-          if (updateError) {
-            console.error('Error updating profile:', updateError);
-            throw new Error(`Failed to update user profile: ${updateError.message}`);
-          }
-        } else {
-          // Create new profile
-          const { error: profileError } = await supabaseAdmin
-            .from('profiles')
-            .insert({
-              id: signUpData.user.id,
-              email: data.email,
-              start_date: firstTimeEntryDate,
-              name: userData.name,
-              job_title: userData.job_title,
-              location: userData.location
-            });
-
-          if (profileError) {
-            console.error('Error creating profile:', profileError);
-            // If profile creation fails, we should clean up the auth user
-            await supabase.auth.admin.deleteUser(signUpData.user.id);
-            throw new Error(`Failed to create user profile: ${profileError.message}`);
-          }
-        }
-
-        console.log('Profile created/updated successfully');
 
         toast({
           title: "Registration successful",

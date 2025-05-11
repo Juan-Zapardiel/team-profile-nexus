@@ -153,7 +153,7 @@ export const ProjectDatabase = ({ projects, onAddProject, onRefresh }: ProjectDa
             ))}
           </SelectContent>
         </Select>
-      </div>
+          </div>
 
       <div className="rounded-md border">
         <Table>

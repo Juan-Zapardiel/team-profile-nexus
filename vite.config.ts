@@ -14,6 +14,8 @@ export default defineConfig(({ mode }) => {
     mode,
     harvestToken: env.VITE_HARVEST_ACCESS_TOKEN ? 'Present' : 'Missing',
     harvestAccountId: env.VITE_HARVEST_ACCOUNT_ID ? 'Present' : 'Missing',
+    supabaseUrl: env.VITE_SUPABASE_URL ? 'Present' : 'Missing',
+    supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY ? 'Present' : 'Missing',
     envKeys: Object.keys(env).filter(key => key.startsWith('VITE_'))
   });
 
@@ -36,6 +38,8 @@ export default defineConfig(({ mode }) => {
     define: {
       'import.meta.env.VITE_HARVEST_ACCESS_TOKEN': JSON.stringify(env.VITE_HARVEST_ACCESS_TOKEN),
       'import.meta.env.VITE_HARVEST_ACCOUNT_ID': JSON.stringify(env.VITE_HARVEST_ACCOUNT_ID),
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
     },
   };
 });
