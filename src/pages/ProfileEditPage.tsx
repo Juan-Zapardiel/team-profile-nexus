@@ -22,7 +22,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Project, Industry, ProjectType } from "@/types";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { getMonthsBetween } from "@/lib/utils";
-import { getUsers, getUserFirstTimeEntryDate } from "@/integrations/harvest/client";
+import { getUsers, getUserFirstTimeEntryDate, getUserTimeEntries } from "@/integrations/harvest/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -286,6 +286,54 @@ const ProfileEditPage = () => {
         throw new Error("No time entries found in Harvest");
       }
 
+      // Get all time entries for the user
+      const timeEntries = await getUserTimeEntries(harvestUser.id);
+      
+      // Extract unique project IDs from time entries
+      const uniqueProjectIds = [...new Set(timeEntries.map(entry => entry.project.id))];
+      
+      // Get all projects from our database
+      const { data: dbProjects, error: projectsError } = await supabase
+        .from("projects")
+        .select("*");
+
+      if (projectsError) throw projectsError;
+
+      // Find matching projects by name (since Harvest and our DB use different IDs)
+      const matchingProjects = dbProjects.filter(dbProject => 
+        timeEntries.some(entry => 
+          entry.project.name.toLowerCase() === dbProject.name.toLowerCase()
+        )
+      );
+
+      // Get current user projects
+      const { data: currentUserProjects, error: currentProjectsError } = await supabase
+        .from("team_member_projects")
+        .select("project_id")
+        .eq("profile_id", user.id);
+
+      if (currentProjectsError) throw currentProjectsError;
+
+      const currentProjectIds = currentUserProjects.map(p => p.project_id);
+
+      // Add new project associations
+      const newProjectIds = matchingProjects
+        .map(p => p.id)
+        .filter(id => !currentProjectIds.includes(id));
+
+      if (newProjectIds.length > 0) {
+        const { error: insertError } = await supabase
+          .from("team_member_projects")
+          .insert(
+            newProjectIds.map(projectId => ({
+              profile_id: user.id,
+              project_id: projectId
+            }))
+          );
+
+        if (insertError) throw insertError;
+      }
+
       // Update the profile with the start date
       const { error: updateError } = await supabase
         .from("profiles")
@@ -299,9 +347,28 @@ const ProfileEditPage = () => {
       // Update local state
       setProfile(prev => prev ? { ...prev, start_date: firstTimeEntryDate } : null);
 
+      // Reload user projects
+      const updatedUserProjects = [...userProjects];
+      for (const projectId of newProjectIds) {
+        const project = dbProjects.find(p => p.id === projectId);
+        if (project) {
+          updatedUserProjects.push({
+            id: project.id,
+            name: project.name,
+            startDate: new Date(project.start_date),
+            endDate: new Date(project.end_date),
+            industry: project.industry as Industry,
+            type: project.type as ProjectType,
+            tools: project.tools as any[],
+            description: project.description || undefined,
+          });
+        }
+      }
+      setUserProjects(updatedUserProjects);
+
       toast({
         title: "Harvest sync successful",
-        description: "Your start date has been updated based on your first time entry.",
+        description: `Your start date has been updated and ${newProjectIds.length} new projects have been added to your profile.`,
       });
     } catch (error: any) {
       toast({
@@ -356,7 +423,7 @@ const ProfileEditPage = () => {
             <Button
               onClick={handleHarvestSync}
               disabled={syncing}
-              variant="outline"
+              variant="default"
               size="sm"
             >
               {syncing ? (

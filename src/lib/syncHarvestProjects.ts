@@ -12,7 +12,7 @@ const PROJECTS_TO_DELETE = [
   "Marketing",
   "Product Development",
   "Training",
-  "Internal events",
+  "Internal Events",
   "Marketing ABM Engine",
   "IT & Operations",
   "Knowledge management",
@@ -21,7 +21,7 @@ const PROJECTS_TO_DELETE = [
   "HVD",
   "HVD_Astera Solutions",
   "Astera",
-  "Taleva company",
+  "Taleva Company",
   "HVD_German_cables",
   "Operations & Finance Project",
   "Solifos Non-Billable"
