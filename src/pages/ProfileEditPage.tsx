@@ -15,13 +15,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Save, Trash2 } from "lucide-react";
+import { Loader2, Save, Trash2, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Tables } from "@/integrations/supabase/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Project, Industry, ProjectType } from "@/types";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { getMonthsBetween } from "@/lib/utils";
+import { getUsers, getUserFirstTimeEntryDate } from "@/integrations/harvest/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,6 +55,7 @@ const ProfileEditPage = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [userProjects, setUserProjects] = useState<Project[]>([]);
@@ -264,6 +266,54 @@ const ProfileEditPage = () => {
     }
   };
 
+  const handleHarvestSync = async () => {
+    if (!user || !profile) return;
+    
+    setSyncing(true);
+    try {
+      // Get all Harvest users to find the matching one
+      const harvestUsers = await getUsers();
+      const harvestUser = harvestUsers.find(h => h.email.toLowerCase() === user.email?.toLowerCase());
+      
+      if (!harvestUser) {
+        throw new Error("No matching Harvest user found for your email");
+      }
+
+      // Get the first time entry date
+      const firstTimeEntryDate = await getUserFirstTimeEntryDate(harvestUser.id);
+      
+      if (!firstTimeEntryDate) {
+        throw new Error("No time entries found in Harvest");
+      }
+
+      // Update the profile with the start date
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          start_date: firstTimeEntryDate
+        })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      setProfile(prev => prev ? { ...prev, start_date: firstTimeEntryDate } : null);
+
+      toast({
+        title: "Harvest sync successful",
+        description: "Your start date has been updated based on your first time entry.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Harvest sync failed",
+        description: error.message || "Failed to sync with Harvest",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -301,7 +351,27 @@ const ProfileEditPage = () => {
       <NavBar />
       <div className="container py-10">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-3xl font-bold mb-8">Edit Your Profile</h1>
+          <div className="flex items-center justify-between mb-8">
+            <h1 className="text-3xl font-bold">Edit Your Profile</h1>
+            <Button
+              onClick={handleHarvestSync}
+              disabled={syncing}
+              variant="outline"
+              size="sm"
+            >
+              {syncing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Sync with Harvest
+                </>
+              )}
+            </Button>
+          </div>
 
           <div className="grid gap-8">
             <Card>
@@ -311,102 +381,100 @@ const ProfileEditPage = () => {
                   Update your personal details and profile information
                 </CardDescription>
               </CardHeader>
-              <form onSubmit={handleProfileUpdate}>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-4 mb-6">
-                    <Avatar 
-                      className="h-20 w-20 [&>span]:bg-[var(--avatar-bg)]" 
-                      style={getAvatarColor(profile.name)}
-                    >
-                      <AvatarFallback className="text-xl text-black">
-                        {profile.name.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="font-medium">{profile.email}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Profile picture currently can't be changed
-                      </p>
-                    </div>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-4 mb-6">
+                  <Avatar 
+                    className="h-20 w-20 [&>span]:bg-[var(--avatar-bg)]" 
+                    style={getAvatarColor(profile.name)}
+                  >
+                    <AvatarFallback className="text-xl text-black">
+                      {profile.name.split(' ').map(n => n[0]).join('')}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="font-medium">{profile.email}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Profile picture currently can't be changed
+                    </p>
                   </div>
+                </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input
-                      id="name"
-                      value={profile.name}
-                      readOnly
-                      disabled
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      value={profile.email}
-                      readOnly
-                      disabled
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="jobTitle">Job Title</Label>
-                    <Input
-                      id="jobTitle"
-                      value={profile.job_title}
-                      onChange={(e) => setProfile({ ...profile, job_title: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="location">Location</Label>
-                    <Input
-                      id="location"
-                      value={profile.location}
-                      onChange={(e) => setProfile({ ...profile, location: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="bio">Bio</Label>
-                    <Textarea
-                      id="bio"
-                      value={profile.bio || ''}
-                      onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                      placeholder="Tell us about yourself and your expertise..."
-                      rows={4}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="startDate">Start Date</Label>
-                    <Input
-                      id="startDate"
-                      type="date"
-                      value={profile.start_date || ''}
-                      onChange={(e) => setProfile({ ...profile, start_date: e.target.value })}
-                    />
-                    {profile.start_date && (
-                      <p className="text-sm text-muted-foreground">
-                        Experience: {getMonthsBetween(new Date(profile.start_date), new Date())} months
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button type="submit" disabled={saving}>
-                    {saving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
-                </CardFooter>
-              </form>
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    value={profile.name}
+                    readOnly
+                    disabled
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    value={profile.email}
+                    readOnly
+                    disabled
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="jobTitle">Job Title</Label>
+                  <Input
+                    id="jobTitle"
+                    value={profile.job_title}
+                    onChange={(e) => setProfile({ ...profile, job_title: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="location">Location</Label>
+                  <Input
+                    id="location"
+                    value={profile.location}
+                    onChange={(e) => setProfile({ ...profile, location: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea
+                    id="bio"
+                    value={profile.bio || ''}
+                    onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+                    placeholder="Tell us about yourself and your expertise..."
+                    rows={4}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="startDate">Start Date</Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={profile.start_date || ''}
+                    onChange={(e) => setProfile({ ...profile, start_date: e.target.value })}
+                  />
+                  {profile.start_date && (
+                    <p className="text-sm text-muted-foreground">
+                      Experience: {getMonthsBetween(new Date(profile.start_date), new Date())} months
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button type="submit" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </CardFooter>
             </Card>
 
             <Card>

@@ -19,7 +19,7 @@ export function getMonthsBetween(startDate: Date, endDate: Date): number {
     months += end.getDate() / 30 - start.getDate() / 30;
   }
   
-  return Math.max(0, Math.round(months * 10) / 10); // Round to one decimal
+  return Math.max(0, Math.ceil(months)); // Always round up to nearest month
 }
 
 // Calculate experience metrics for a set of projects

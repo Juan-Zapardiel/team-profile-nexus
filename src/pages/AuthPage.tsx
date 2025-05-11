@@ -198,6 +198,22 @@ const AuthPage = () => {
 
         console.log('User created:', signUpData.user.id);
 
+        // Update the user's profile with the start date
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            name: userData.name,
+            job_title: userData.job_title,
+            location: userData.location,
+            start_date: userData.start_date,
+          })
+          .eq('id', signUpData.user.id);
+
+        if (profileError) {
+          console.error('Error updating profile:', profileError);
+          throw profileError;
+        }
+
         toast({
           title: "Registration successful",
           description: "Please check your email to verify your account. You will be redirected to the login page.",
