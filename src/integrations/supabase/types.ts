@@ -80,16 +80,19 @@ export type Database = {
           id: string
           profile_id: string
           project_id: string
+          days_worked: number
         }
         Insert: {
           id?: string
           profile_id: string
           project_id: string
+          days_worked?: number
         }
         Update: {
           id?: string
           profile_id?: string
           project_id?: string
+          days_worked?: number
         }
         Relationships: [
           {

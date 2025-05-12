@@ -30,6 +30,7 @@ export interface Project {
   description?: string;
   teamMembers?: string[];
   totalHours?: number;
+  daysWorked?: number;
 }
 
 export interface TeamMember {

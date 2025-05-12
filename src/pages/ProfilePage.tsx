@@ -12,7 +12,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { NavBar } from "@/components/NavBar";
 import { Tables } from "@/integrations/supabase/types";
 import { useToast } from "@/components/ui/use-toast";
-import { Project } from "@/types";
+import { Project, Industry, ProjectType } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 
@@ -78,29 +78,26 @@ const ProfilePage = () => {
           
         if (profileError) throw profileError;
         
-        // Fetch projects for this profile
+        // Fetch projects for this profile with days worked
         const { data: teammemberProjects, error: teammemberProjectsError } = await supabase
           .from('team_member_projects')
-          .select('*')
+          .select('*, projects(*)')
           .eq('profile_id', memberId);
           
         if (teammemberProjectsError) throw teammemberProjectsError;
         
-        // If there are projects, fetch their details
-        let profileProjects: Project[] = [];
-        
-        if (teammemberProjects && teammemberProjects.length > 0) {
-          const projectIds = teammemberProjects.map((tmp: TeamMemberProject) => tmp.project_id);
-          
-          const { data: projectsData, error: projectsError } = await supabase
-            .from('projects')
-            .select('*')
-            .in('id', projectIds);
-            
-          if (projectsError) throw projectsError;
-          
-          profileProjects = (projectsData || []).map(convertToProjectType);
-        }
+        // Convert projects and include days worked
+        const profileProjects: Project[] = teammemberProjects.map((tmp: any) => ({
+          id: tmp.projects.id,
+          name: tmp.projects.name,
+          startDate: new Date(tmp.projects.start_date),
+          endDate: new Date(tmp.projects.end_date),
+          industry: tmp.projects.industry as Industry,
+          type: tmp.projects.type as ProjectType,
+          tools: tmp.projects.tools as any[],
+          description: tmp.projects.description || undefined,
+          daysWorked: tmp.days_worked || 0
+        }));
         
         setProfile(profileData);
         setProjects(profileProjects);
@@ -310,12 +307,14 @@ const ProfilePage = () => {
           {projects.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">No projects found for this team member.</p>
           ) : (
-            <div className="space-y-6">
-              {projects
-                .sort((a, b) => b.endDate.getTime() - a.endDate.getTime())
-                .map((project) => (
-                  <ProjectListItem key={project.id} project={project} />
-                ))}
+            <div className="space-y-4">
+              {projects.map((project) => (
+                <ProjectListItem
+                  key={project.id}
+                  project={project}
+                  showDaysWorked={true}
+                />
+              ))}
             </div>
           )}
         </div>

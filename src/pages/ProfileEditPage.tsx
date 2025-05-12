@@ -289,22 +289,12 @@ const ProfileEditPage = () => {
       // Get all time entries for the user
       const timeEntries = await getUserTimeEntries(harvestUser.id);
       
-      // Extract unique project IDs from time entries
-      const uniqueProjectIds = [...new Set(timeEntries.map(entry => entry.project.id))];
-      
       // Get all projects from our database
       const { data: dbProjects, error: projectsError } = await supabase
         .from("projects")
         .select("*");
 
       if (projectsError) throw projectsError;
-
-      // Find matching projects by name (since Harvest and our DB use different IDs)
-      const matchingProjects = dbProjects.filter(dbProject => 
-        timeEntries.some(entry => 
-          entry.project.name.toLowerCase() === dbProject.name.toLowerCase()
-        )
-      );
 
       // Get current user projects
       const { data: currentUserProjects, error: currentProjectsError } = await supabase
@@ -316,23 +306,73 @@ const ProfileEditPage = () => {
 
       const currentProjectIds = currentUserProjects.map(p => p.project_id);
 
-      // Add new project associations
+      // Calculate days worked for each project
+      const projectDaysWorked = new Map<string, number>();
+      
+      // First, initialize all current projects with 0 days
+      currentProjectIds.forEach(projectId => {
+        projectDaysWorked.set(projectId, 0);
+      });
+
+      // Then calculate days worked for projects with time entries
+      dbProjects.forEach(dbProject => {
+        const projectEntries = timeEntries.filter(entry => 
+          entry.project.name.toLowerCase() === dbProject.name.toLowerCase()
+        );
+        
+        if (projectEntries.length > 0) {
+          // Get unique dates for this project
+          const uniqueDates = new Set(projectEntries.map(entry => entry.spent_date));
+          projectDaysWorked.set(dbProject.id, uniqueDates.size);
+        }
+      });
+
+      // Find matching projects by name (since Harvest and our DB use different IDs)
+      const matchingProjects = dbProjects.filter(dbProject => 
+        timeEntries.some(entry => 
+          entry.project.name.toLowerCase() === dbProject.name.toLowerCase()
+        )
+      );
+
+      // Add new project associations and update days worked
       const newProjectIds = matchingProjects
         .map(p => p.id)
         .filter(id => !currentProjectIds.includes(id));
 
-      if (newProjectIds.length > 0) {
-        const { error: insertError } = await supabase
-          .from("team_member_projects")
-          .insert(
-            newProjectIds.map(projectId => ({
-              profile_id: user.id,
-              project_id: projectId
-            }))
-          );
+      // Prepare batch operations for new and existing projects
+      const operations = [];
 
-        if (insertError) throw insertError;
+      // Add new project associations
+      if (newProjectIds.length > 0) {
+        operations.push(
+          supabase
+            .from("team_member_projects")
+            .insert(
+              newProjectIds.map(projectId => ({
+                profile_id: user.id,
+                project_id: projectId,
+                days_worked: projectDaysWorked.get(projectId) || 0
+              }))
+            )
+        );
       }
+
+      // Update days worked for all existing projects
+      if (currentProjectIds.length > 0) {
+        // Update each project's days worked individually
+        for (const projectId of currentProjectIds) {
+          operations.push(
+            supabase
+              .from("team_member_projects")
+              .update({ days_worked: projectDaysWorked.get(projectId) || 0 })
+              .eq("profile_id", user.id)
+              .eq("project_id", projectId)
+          );
+        }
+      }
+
+      // Execute all operations
+      await Promise.all(operations);
 
       // Update the profile with the start date
       const { error: updateError } = await supabase
@@ -361,6 +401,7 @@ const ProfileEditPage = () => {
             type: project.type as ProjectType,
             tools: project.tools as any[],
             description: project.description || undefined,
+            daysWorked: projectDaysWorked.get(project.id) || 0
           });
         }
       }
@@ -368,7 +409,7 @@ const ProfileEditPage = () => {
 
       toast({
         title: "Harvest sync successful",
-        description: `Your start date has been updated and ${newProjectIds.length} new projects have been added to your profile.`,
+        description: `Your start date has been updated and ${newProjectIds.length} new projects have been added to your profile. Days worked have been updated for all projects.`,
       });
     } catch (error: any) {
       toast({
